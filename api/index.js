@@ -381,7 +381,7 @@ function handleStream(req, res, url) {
             return streams.map((s) => ({
               name: `Streamed.pk - ${s.language || "Stream"} ${s.hd ? "(HD)" : ""}`,
               title: `${match.title}\n${s.language || "Stream"} ${s.hd ? "HD" : "SD"}`,
-              url: s.embedUrl,
+              externalUrl: s.embedUrl,
               quality: s.hd ? "HD" : "SD",
               isM3u8: false,
               type: "web",
@@ -417,13 +417,8 @@ function handleStream(req, res, url) {
   }
   
   Promise.all([
-    fetchUrl(`https://dembed.st/premiumtv/daddy.php?id=${chId}`, { Referer: "https://dlive.sx/" })
-      .then((r) => {
-        const m = r.body.match(/const\s+SRC\s*=\s*"([^"]+\.m3u8[^"]*)"/i);
-        if (!m) throw new Error("SRC bulunamadi");
-        return { name: "Justemir Sport - Sunucu 1 (DLHD)", url: m[1].replace(/\\\//g, "/"), headers: { "User-Agent": UA, Referer: "https://dembed.st/" } };
-      })
-      .catch(() => null),
+    // Sunucu 1 (DLHD) - devre disi: segmentler PNG image, Nuvio oynatamiyor
+    Promise.resolve(null),
     fetchUrl(`https://dlive.sx/cast/stream-${chId}.php`, { Referer: "https://dlive.sx/" })
       .then((r) => {
         const m = r.body.match(/tossequip\.net\/e\/([a-z0-9]+)/i);
