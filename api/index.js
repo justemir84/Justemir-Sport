@@ -169,6 +169,26 @@ const CHANNELS = {
 let streamedCache = { data: [], timestamp: 0 };
 const STREAMED_CACHE_TTL = 5 * 60 * 1000;
 
+// sportsbite.org cache (refreshed every 10 minutes)
+let sportsbiteCache = { data: [], timestamp: 0 };
+const SPORTSBITE_CACHE_TTL = 10 * 60 * 1000;
+
+async function getSportsBiteChannels() {
+  const now = Date.now();
+  if (sportsbiteCache.data.length > 0 && (now - sportsbiteCache.timestamp) < SPORTSBITE_CACHE_TTL) {
+    return sportsbiteCache.data;
+  }
+  try {
+    const r = await fetchUrl("https://sportsbite.org/channels", { Referer: "https://sportsbite.org/" });
+    const json = JSON.parse(r.body);
+    const channels = json.channels || [];
+    sportsbiteCache = { data: channels, timestamp: now };
+    return channels;
+  } catch (e) {
+    return sportsbiteCache.data;
+  }
+}
+
 async function getStreamedMatches() {
   const now = Date.now();
   if (streamedCache.data.length > 0 && (now - streamedCache.timestamp) < STREAMED_CACHE_TTL) {
@@ -243,7 +263,8 @@ const manifest = {
   catalogs: [
     { id: "bein-sports", name: "beIN Sports", type: "tv", extra: [{ name: "search", isRequired: false }] },
     { id: "canli-sport", name: "Canli Spor Kanallari", type: "tv", extra: [{ name: "search", isRequired: false }] },
-    { id: "streamed-live", name: "Streamed.pk Canli Maclar", type: "tv", extra: [{ name: "search", isRequired: false }] }
+    { id: "streamed-live", name: "Streamed.pk Canli Maclar", type: "tv", extra: [{ name: "search", isRequired: false }] },
+    { id: "sportsbite", name: "SportsBite Kanallar", type: "tv", extra: [{ name: "search", isRequired: false }] }
   ]
 };
 
@@ -260,6 +281,30 @@ function handleCatalog(req, res, url) {
         name: m.title,
         poster: m.poster ? `https://streamed.pk${m.poster}` : "https://streamed.pk/favicon.ico",
         description: m.teams ? `${m.teams.home ? m.teams.home.name : ""} vs ${m.teams.away ? m.teams.away.name : ""}` : m.title
+      }));
+      
+      if (search) {
+        const q = search.toLowerCase();
+        items = items.filter((item) => item.name.toLowerCase().includes(q));
+      }
+      
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({ metas: items });
+    }).catch(() => {
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({ metas: [] });
+    });
+    return;
+  }
+  
+  if (catalogId === "sportsbite") {
+    getSportsBiteChannels().then((channels) => {
+      let items = channels.map((c) => ({
+        id: `sb:${c.id}`,
+        type: "tv",
+        name: c.name,
+        poster: c.logo_url || c.image || "https://sportsbite.org/favicon.ico",
+        description: `${c.category || "Sports"} - ${c.country || ""}`
       }));
       
       if (search) {
@@ -300,6 +345,36 @@ function handleMeta(req, res, url) {
   const pathParts = pathname.split("/");
   let id = pathParts[pathParts.length - 1].replace(".json", "");
   id = id.replace(/%3A/gi, ":");
+  
+  if (id.startsWith("sb:")) {
+    const channelId = id.replace(/^sb:/i, "");
+    getSportsBiteChannels().then((channels) => {
+      const ch = channels.find((c) => c.id === channelId);
+      if (!ch) {
+        res.setHeader("Content-Type", "application/json");
+        res.status(404).json({ meta: null });
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({
+        meta: {
+          id: `sb:${ch.id}`,
+          type: "tv",
+          name: ch.name,
+          poster: ch.logo_url || ch.image || "https://sportsbite.org/favicon.ico",
+          posterShape: "square",
+          background: ch.logo_url || ch.image || "https://sportsbite.org/favicon.ico",
+          description: `${ch.category || "Sports"} - ${ch.country || ""}`,
+          genres: [ch.category || "Sports", "Canli"],
+          releaseInfo: "LIVE"
+        }
+      });
+    }).catch(() => {
+      res.setHeader("Content-Type", "application/json");
+      res.status(404).json({ meta: null });
+    });
+    return;
+  }
   
   if (id.startsWith("spk:")) {
     const matchId = id.replace(/^spk:/i, "");
@@ -362,6 +437,39 @@ function handleStream(req, res, url) {
   let pathname = decodeURIComponent(url.pathname);
   const pathParts = pathname.split("/");
   const id = pathParts[pathParts.length - 1].replace(".json", "");
+  
+  if (id.startsWith("sb:")) {
+    const channelId = id.replace(/^sb:/i, "");
+    getSportsBiteChannels().then((channels) => {
+      const ch = channels.find((c) => c.id === channelId);
+      if (!ch) {
+        res.setHeader("Content-Type", "application/json");
+        res.status(200).json({ streams: [] });
+        return;
+      }
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({
+        streams: [{
+          name: `SportsBite - ${ch.name}`,
+          title: `${ch.name}\nCANLI`,
+          externalUrl: ch.embed_url || ch.iframe_url || ch.manifest_url,
+          quality: "LIVE",
+          isM3u8: false,
+          type: "web",
+          headers: {},
+          subtitles: [],
+          provider: "sportsbite",
+          behaviorHints: {
+            notWebReady: true
+          }
+        }]
+      });
+    }).catch(() => {
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({ streams: [] });
+    });
+    return;
+  }
   
   if (id.startsWith("spk:")) {
     const matchId = id.replace(/^spk:/i, "");

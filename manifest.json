@@ -14,6 +14,7 @@
   "catalogs": [
     { "id": "bein-sports", "name": "beIN Sports", "type": "tv", "extra": [{ "name": "search", "isRequired": false }] },
     { "id": "canli-sport", "name": "Canli Spor Kanallari", "type": "tv", "extra": [{ "name": "search", "isRequired": false }] },
-    { "id": "streamed-live", "name": "Streamed.pk Canli Maclar", "type": "tv", "extra": [{ "name": "search", "isRequired": false }] }
+    { "id": "streamed-live", "name": "Streamed.pk Canli Maclar", "type": "tv", "extra": [{ "name": "search", "isRequired": false }] },
+    { "id": "sportsbite", "name": "SportsBite Kanallar", "type": "tv", "extra": [{ "name": "search", "isRequired": false }] }
   ]
 }
