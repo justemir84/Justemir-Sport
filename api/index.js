@@ -193,6 +193,7 @@ const manifest = {
   logo: "https://dlive.sx/assets/logos/logo.png",
   resources: [
     { name: "catalog", types: ["channel"], idPrefixes: ["jss"] },
+    { name: "meta", types: ["channel"], idPrefixes: ["jss"] },
     { name: "stream", types: ["channel"], idPrefixes: ["jss"] }
   ],
   types: ["channel"],
@@ -224,6 +225,30 @@ function handleCatalog(req, res, url) {
   
   res.setHeader("Content-Type", "application/json");
   res.status(200).json({ metas: items });
+}
+
+function handleMeta(req, res, url) {
+  const pathParts = url.pathname.split("/");
+  const id = pathParts[pathParts.length - 1].replace(".json", "");
+  const chId = id.replace("jss:", "").replace(/[^0-9]/g, "");
+  
+  if (!chId || !CHANNELS[chId]) {
+    res.setHeader("Content-Type", "application/json");
+    res.status(404).json({ meta: null });
+    return;
+  }
+  
+  res.setHeader("Content-Type", "application/json");
+  res.status(200).json({
+    meta: {
+      id: `jss:${chId}`,
+      type: "channel",
+      name: CHANNELS[chId],
+      poster: "https://dlive.sx/assets/logos/logo.png",
+      description: "Canli spor kanali - " + CHANNELS[chId],
+      genres: ["Spor", "Canli"]
+    }
+  });
 }
 
 function handleStream(req, res, url) {
@@ -278,6 +303,8 @@ module.exports = (req, res) => {
     res.status(200).json(manifest);
   } else if (url.pathname.startsWith("/catalog/")) {
     handleCatalog(req, res, url);
+  } else if (url.pathname.startsWith("/meta/")) {
+    handleMeta(req, res, url);
   } else if (url.pathname.startsWith("/stream/")) {
     handleStream(req, res, url);
   } else {
