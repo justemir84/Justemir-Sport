@@ -320,9 +320,21 @@ function handleStream(req, res, url) {
       .catch(() => null)
   ]).then((results) => {
     const streams = results.filter(Boolean).map((s) => ({
-      title: CHANNELS[chId] || `Kanal ${chId}`,
+      name: "Justemir Sport - " + s.name.replace("Justemir Sport - ", ""),
+      title: (CHANNELS[chId] || `Kanal ${chId}`) + "\nCANLI - " + s.name.replace("Justemir Sport - ", ""),
       url: s.url,
-      headers: s.headers
+      quality: "LIVE",
+      isM3u8: true,
+      type: "hls",
+      headers: s.headers,
+      subtitles: [],
+      provider: "dlivesport",
+      behaviorHints: {
+        notWebReady: true,
+        proxyHeaders: {
+          request: s.headers
+        }
+      }
     }));
     
     res.setHeader("Content-Type", "application/json");
