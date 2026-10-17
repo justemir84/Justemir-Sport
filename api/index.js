@@ -165,6 +165,25 @@ const CHANNELS = {
   "703": "TV4 Sport Live 1 Sweden"
 };
 
+// streamed.pk cache (refreshed every 5 minutes)
+let streamedCache = { data: [], timestamp: 0 };
+const STREAMED_CACHE_TTL = 5 * 60 * 1000;
+
+async function getStreamedMatches() {
+  const now = Date.now();
+  if (streamedCache.data.length > 0 && (now - streamedCache.timestamp) < STREAMED_CACHE_TTL) {
+    return streamedCache.data;
+  }
+  try {
+    const r = await fetchUrl("https://streamed.pk/api/matches/live");
+    const matches = JSON.parse(r.body);
+    streamedCache = { data: matches, timestamp: now };
+    return matches;
+  } catch (e) {
+    return streamedCache.data;
+  }
+}
+
 const CATALOGS = {
   "bein-sports": ["62", "63", "64", "67", "1010", "61", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "100", "116", "117", "118", "494", "495", "496", "497", "498", "499", "500", "425", "372", "578", "597", "491", "492", "493", "712", "713", "714"],
   "canli-sport": ["62", "63", "64", "67", "1010", "889", "1011", "31", "32", "33", "34", "35", "38", "60", "65", "70", "366", "449", "554", "230", "451", "39", "44", "45", "66", "308", "318", "399", "404", "405", "667", "376", "240", "241", "556", "557", "558", "571", "641", "426", "427", "119", "120", "122", "271", "460", "461", "462", "870", "577", "869", "878", "879", "882", "84", "445", "446", "524", "525", "537", "538", "528", "49", "74", "454", "455", "456", "47", "48", "50", "57", "58", "129", "78", "79", "80", "81", "82", "83", "88", "149", "150", "387", "388", "925", "929", "935", "41", "42", "631", "632", "599", "101", "102", "103", "453", "134", "135", "429", "430", "432", "433", "472", "465", "466", "600", "601", "609", "604", "605", "606", "614", "615", "619", "781", "782", "123", "124", "125", "267", "269", "450", "820", "587", "588", "808", "810", "812", "703"]
@@ -215,15 +234,16 @@ const manifest = {
   description: "Canli spor kanallari (beIN SPORTS odakli) - DLHD + SwarmCloud backend",
   logo: "https://dlive.sx/assets/logos/logo.png",
   resources: [
-    { name: "catalog", types: ["tv"], idPrefixes: ["jss"] },
-    { name: "meta", types: ["tv"], idPrefixes: ["jss"] },
-    { name: "stream", types: ["tv"], idPrefixes: ["jss"] }
+    { name: "catalog", types: ["tv"], idPrefixes: ["jss", "spk"] },
+    { name: "meta", types: ["tv"], idPrefixes: ["jss", "spk"] },
+    { name: "stream", types: ["tv"], idPrefixes: ["jss", "spk"] }
   ],
   types: ["tv"],
-  idPrefixes: ["jss"],
+  idPrefixes: ["jss", "spk"],
   catalogs: [
     { id: "bein-sports", name: "beIN Sports", type: "tv", extra: [{ name: "search", isRequired: false }] },
-    { id: "canli-sport", name: "Canli Spor Kanallari", type: "tv", extra: [{ name: "search", isRequired: false }] }
+    { id: "canli-sport", name: "Canli Spor Kanallari", type: "tv", extra: [{ name: "search", isRequired: false }] },
+    { id: "streamed-live", name: "Streamed.pk Canli Maclar", type: "tv", extra: [{ name: "search", isRequired: false }] }
   ]
 };
 
@@ -231,6 +251,30 @@ function handleCatalog(req, res, url) {
   const pathParts = url.pathname.split("/");
   const catalogId = pathParts[pathParts.length - 1].replace(".json", "");
   const search = url.searchParams.get("search") || "";
+  
+  if (catalogId === "streamed-live") {
+    getStreamedMatches().then((matches) => {
+      let items = matches.map((m) => ({
+        id: `spk:${m.id}`,
+        type: "tv",
+        name: m.title,
+        poster: m.poster ? `https://streamed.pk${m.poster}` : "https://streamed.pk/favicon.ico",
+        description: m.teams ? `${m.teams.home ? m.teams.home.name : ""} vs ${m.teams.away ? m.teams.away.name : ""}` : m.title
+      }));
+      
+      if (search) {
+        const q = search.toLowerCase();
+        items = items.filter((item) => item.name.toLowerCase().includes(q));
+      }
+      
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({ metas: items });
+    }).catch(() => {
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({ metas: [] });
+    });
+    return;
+  }
   
   let ids = CATALOGS[catalogId] || [];
   
@@ -255,8 +299,39 @@ function handleMeta(req, res, url) {
   let pathname = decodeURIComponent(url.pathname);
   const pathParts = pathname.split("/");
   let id = pathParts[pathParts.length - 1].replace(".json", "");
-  // Handle URL-encoded colon
   id = id.replace(/%3A/gi, ":");
+  
+  if (id.startsWith("spk:")) {
+    const matchId = id.replace(/^spk:/i, "");
+    getStreamedMatches().then((matches) => {
+      const match = matches.find((m) => m.id === matchId);
+      if (!match) {
+        res.setHeader("Content-Type", "application/json");
+        res.status(404).json({ meta: null });
+        return;
+      }
+      const posterUrl = match.poster ? `https://streamed.pk${match.poster}` : "https://streamed.pk/favicon.ico";
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({
+        meta: {
+          id: `spk:${match.id}`,
+          type: "tv",
+          name: match.title,
+          poster: posterUrl,
+          posterShape: "poster",
+          background: posterUrl,
+          description: match.teams ? `${match.teams.home ? match.teams.home.name : ""} vs ${match.teams.away ? match.teams.away.name : ""}` : match.title,
+          genres: [match.category || "Spor", "Canli"],
+          releaseInfo: "LIVE"
+        }
+      });
+    }).catch(() => {
+      res.setHeader("Content-Type", "application/json");
+      res.status(404).json({ meta: null });
+    });
+    return;
+  }
+  
   const chId = id.replace(/^jss:/i, "").replace(/[^0-9]/g, "");
   
   if (!chId) {
@@ -284,9 +359,56 @@ function handleMeta(req, res, url) {
 }
 
 function handleStream(req, res, url) {
-  const pathParts = url.pathname.split("/");
+  let pathname = decodeURIComponent(url.pathname);
+  const pathParts = pathname.split("/");
   const id = pathParts[pathParts.length - 1].replace(".json", "");
-  const chId = id.replace("jss:", "").replace(/[^0-9]/g, "");
+  
+  if (id.startsWith("spk:")) {
+    const matchId = id.replace(/^spk:/i, "");
+    getStreamedMatches().then((matches) => {
+      const match = matches.find((m) => m.id === matchId);
+      if (!match || !match.sources || match.sources.length === 0) {
+        res.setHeader("Content-Type", "application/json");
+        res.status(200).json({ streams: [] });
+        return;
+      }
+      
+      // Fetch streams from all sources in parallel
+      const sourcePromises = match.sources.map((src) => {
+        return fetchUrl(`https://streamed.pk/api/stream/${src.source}/${src.id}`)
+          .then((r) => {
+            const streams = JSON.parse(r.body);
+            return streams.map((s) => ({
+              name: `Streamed.pk - ${s.language || "Stream"} ${s.hd ? "(HD)" : ""}`,
+              title: `${match.title}\n${s.language || "Stream"} ${s.hd ? "HD" : "SD"}`,
+              url: s.embedUrl,
+              quality: s.hd ? "HD" : "SD",
+              isM3u8: false,
+              type: "web",
+              headers: {},
+              subtitles: [],
+              provider: "streamedpk",
+              behaviorHints: {
+                notWebReady: true
+              }
+            }));
+          })
+          .catch(() => []);
+      });
+      
+      Promise.all(sourcePromises).then((results) => {
+        const allStreams = results.flat();
+        res.setHeader("Content-Type", "application/json");
+        res.status(200).json({ streams: allStreams });
+      });
+    }).catch(() => {
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).json({ streams: [] });
+    });
+    return;
+  }
+  
+  const chId = id.replace(/^jss:/i, "").replace(/[^0-9]/g, "");
   
   if (!chId) {
     res.setHeader("Content-Type", "application/json");

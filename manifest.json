@@ -5,12 +5,12 @@
   "description": "Canli spor kanallari (beIN SPORTS odakli) - DLHD + SwarmCloud backend",
   "logo": "https://dlive.sx/assets/logos/logo.png",
   "resources": [
-    { "name": "catalog", "types": ["tv"], "idPrefixes": ["jss"] },
-    { "name": "meta", "types": ["tv"], "idPrefixes": ["jss"] },
-    { "name": "stream", "types": ["tv"], "idPrefixes": ["jss"] }
+    { "name": "catalog", "types": ["tv"], "idPrefixes": ["jss", "spk"] },
+    { "name": "meta", "types": ["tv"], "idPrefixes": ["jss", "spk"] },
+    { "name": "stream", "types": ["tv"], "idPrefixes": ["jss", "spk"] }
   ],
   "types": ["tv"],
-  "idPrefixes": ["jss"],
+  "idPrefixes": ["jss", "spk"],
   "catalogs": [
     { "id": "bein-sports", "name": "beIN Sports", "type": "tv", "extra": [{ "name": "search", "isRequired": false }] },
     { "id": "canli-sport", "name": "Canli Spor Kanallari", "type": "tv", "extra": [{ "name": "search", "isRequired": false }] }
