@@ -443,7 +443,8 @@ function handleStream(req, res, url) {
   ]).then((results) => {
     const streams = results.filter(Boolean).map((s) => {
       const referer = (s.headers && s.headers.Referer) || "";
-      const proxiedUrl = `/proxy?url=${encodeURIComponent(s.url)}&referer=${encodeURIComponent(referer)}`;
+      const origin = referer.replace(/\/$/, "");
+      const proxiedUrl = `/api/manifest?url=${encodeURIComponent(s.url)}&referer=${encodeURIComponent(referer)}&origin=${encodeURIComponent(origin)}`;
       return {
         name: "Justemir Sport - " + s.name.replace("Justemir Sport - ", ""),
         title: (CHANNELS[chId] || `Kanal ${chId}`) + "\nCANLI - " + s.name.replace("Justemir Sport - ", ""),
@@ -451,11 +452,19 @@ function handleStream(req, res, url) {
         quality: "LIVE",
         isM3u8: true,
         type: "hls",
+        resolution: "HD",
         headers: s.headers,
         subtitles: [],
         provider: "dlivesport",
         behaviorHints: {
-          notWebReady: true
+          notWebReady: true,
+          proxyHeaders: {
+            request: {
+              "Referer": referer,
+              "Origin": origin,
+              "User-Agent": (s.headers && s.headers["User-Agent"]) || UA
+            }
+          }
         }
       };
     });
@@ -477,17 +486,18 @@ module.exports = (req, res) => {
     handleMeta(req, res, url);
   } else if (url.pathname.startsWith("/stream/")) {
     handleStream(req, res, url);
-  } else if (url.pathname === "/proxy") {
-    handleProxy(req, res, url);
+  } else if (url.pathname === "/api/manifest") {
+    handleManifest(req, res, url);
   } else {
     res.status(404).json({ error: "Not found" });
   }
 };
 
-// Stream proxy - fetches content with proper headers
-function handleProxy(req, res, url) {
+// Stream manifest proxy - fetches content with proper headers (like Nuvio Live Sports)
+function handleManifest(req, res, url) {
   const targetUrl = url.searchParams.get("url");
   const referer = url.searchParams.get("referer") || "";
+  const origin = url.searchParams.get("origin") || "";
   
   if (!targetUrl) {
     res.status(400).json({ error: "Missing url parameter" });
@@ -496,6 +506,7 @@ function handleProxy(req, res, url) {
   
   const headers = { "User-Agent": UA };
   if (referer) headers["Referer"] = referer;
+  if (origin) headers["Origin"] = origin;
   
   const lib = targetUrl.startsWith("https") ? https : http;
   const proxyReq = lib.get(targetUrl, { headers }, (proxyRes) => {
@@ -508,13 +519,11 @@ function handleProxy(req, res, url) {
         const rewritten = data.split("\n").map((line) => {
           line = line.trim();
           if (line && !line.startsWith("#") && !line.startsWith("http")) {
-            // Relative URL - make it absolute and proxy it
             const absUrl = baseUrl + line;
-            return `https://${req.headers.host}/proxy?url=${encodeURIComponent(absUrl)}&referer=${encodeURIComponent(referer)}`;
+            return `https://${req.headers.host}/api/manifest?url=${encodeURIComponent(absUrl)}&referer=${encodeURIComponent(referer)}&origin=${encodeURIComponent(origin)}`;
           }
           if (line && !line.startsWith("#") && line.startsWith("http")) {
-            // Absolute URL - proxy it
-            return `https://${req.headers.host}/proxy?url=${encodeURIComponent(line)}&referer=${encodeURIComponent(referer)}`;
+            return `https://${req.headers.host}/api/manifest?url=${encodeURIComponent(line)}&referer=${encodeURIComponent(referer)}&origin=${encodeURIComponent(origin)}`;
           }
           return line;
         }).join("\n");
