@@ -1,0 +1,27 @@
+{
+  "id": "app.justemir.sport",
+  "name": "Justemir Sport",
+  "version": "1.0.0",
+  "author": "justemir84",
+  "description": "Canli spor kanallari (beIN SPORTS odakli) - DLHD + SwarmCloud backend",
+  "scrapers": [
+    {
+      "id": "dlivesport",
+      "name": "Justemir Sport (Canli)",
+      "logo": "https://dlive.sx/assets/logos/logo.png",
+      "version": "1.0.0",
+      "description": "beIN SPORTS 1-5 TR + ~130 canli spor kanali; katalog + yayin",
+      "filename": "providers/dlivesport.js",
+      "supportedTypes": ["channel"],
+      "contentLanguage": ["tr", "en"],
+      "supportsStreams": true,
+      "supportsSearch": true,
+      "supportsComments": false,
+      "enabled": true,
+      "catalogs": [
+        { "id": "bein-sports", "name": "beIN Sports", "type": "channel", "extra": [{ "name": "search", "isRequired": false }] },
+        { "id": "canli-sport", "name": "Canli Spor Kanallari", "type": "channel", "extra": [{ "name": "search", "isRequired": false }] }
+      ]
+    }
+  ]
+}
