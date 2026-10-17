@@ -205,7 +205,6 @@ const manifest = {
 
 function handleCatalog(req, res, url) {
   const pathParts = url.pathname.split("/");
-  // /catalog/channel/bein-sports.json or with search
   const catalogId = pathParts[pathParts.length - 1].replace(".json", "");
   const search = url.searchParams.get("search") || "";
   
@@ -273,17 +272,6 @@ function handleStream(req, res, url) {
 
 module.exports = (req, res) => {
   const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
-  
-  // Debug: return the actual path received
-  res.setHeader("Content-Type", "application/json");
-  res.status(200).json({ 
-    path: url.pathname, 
-    fullUrl: req.url, 
-    host: req.headers.host,
-    method: req.method,
-    query: url.search
-  });
-  return;
   
   if (url.pathname === "/manifest.json") {
     res.setHeader("Content-Type", "application/json");
