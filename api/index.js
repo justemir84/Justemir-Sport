@@ -228,25 +228,34 @@ function handleCatalog(req, res, url) {
 }
 
 function handleMeta(req, res, url) {
-  const pathParts = url.pathname.split("/");
-  const id = pathParts[pathParts.length - 1].replace(".json", "");
-  const chId = id.replace("jss:", "").replace(/[^0-9]/g, "");
+  // Decode URL-encoded characters
+  let pathname = decodeURIComponent(url.pathname);
+  const pathParts = pathname.split("/");
+  let id = pathParts[pathParts.length - 1].replace(".json", "");
+  // Handle URL-encoded colon
+  id = id.replace(/%3A/gi, ":");
+  const chId = id.replace(/^jss:/i, "").replace(/[^0-9]/g, "");
   
-  if (!chId || !CHANNELS[chId]) {
+  if (!chId) {
     res.setHeader("Content-Type", "application/json");
     res.status(404).json({ meta: null });
     return;
   }
+  
+  const name = CHANNELS[chId] || ("Kanal " + chId);
   
   res.setHeader("Content-Type", "application/json");
   res.status(200).json({
     meta: {
       id: `jss:${chId}`,
       type: "channel",
-      name: CHANNELS[chId],
+      name: name,
       poster: "https://dlive.sx/assets/logos/logo.png",
-      description: "Canli spor kanali - " + CHANNELS[chId],
-      genres: ["Spor", "Canli"]
+      posterShape: "square",
+      background: "https://dlive.sx/assets/logos/logo.png",
+      description: "Canli spor kanali - " + name,
+      genres: ["Spor", "Canli"],
+      releaseInfo: "LIVE"
     }
   });
 }
