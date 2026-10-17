@@ -272,14 +272,18 @@ function handleStream(req, res, url) {
 }
 
 module.exports = (req, res) => {
-  const url = new URL(req.url, `https://${req.headers.host}`);
+  const url = new URL(req.url, `https://${req.headers.host || "localhost"}`);
   
   // Debug: return the actual path received
-  if (url.pathname === "/debug") {
-    res.setHeader("Content-Type", "application/json");
-    res.status(200).json({ path: url.pathname, fullUrl: req.url, host: req.headers.host });
-    return;
-  }
+  res.setHeader("Content-Type", "application/json");
+  res.status(200).json({ 
+    path: url.pathname, 
+    fullUrl: req.url, 
+    host: req.headers.host,
+    method: req.method,
+    query: url.search
+  });
+  return;
   
   if (url.pathname === "/manifest.json") {
     res.setHeader("Content-Type", "application/json");
