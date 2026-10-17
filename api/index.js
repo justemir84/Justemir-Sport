@@ -319,23 +319,24 @@ function handleStream(req, res, url) {
       })
       .catch(() => null)
   ]).then((results) => {
-    const streams = results.filter(Boolean).map((s) => ({
-      name: "Justemir Sport - " + s.name.replace("Justemir Sport - ", ""),
-      title: (CHANNELS[chId] || `Kanal ${chId}`) + "\nCANLI - " + s.name.replace("Justemir Sport - ", ""),
-      url: s.url,
-      quality: "LIVE",
-      isM3u8: true,
-      type: "hls",
-      headers: s.headers,
-      subtitles: [],
-      provider: "dlivesport",
-      behaviorHints: {
-        notWebReady: true,
-        proxyHeaders: {
-          request: s.headers
+    const streams = results.filter(Boolean).map((s) => {
+      const referer = (s.headers && s.headers.Referer) || "";
+      const proxiedUrl = `/proxy?url=${encodeURIComponent(s.url)}&referer=${encodeURIComponent(referer)}`;
+      return {
+        name: "Justemir Sport - " + s.name.replace("Justemir Sport - ", ""),
+        title: (CHANNELS[chId] || `Kanal ${chId}`) + "\nCANLI - " + s.name.replace("Justemir Sport - ", ""),
+        url: `https://${req.headers.host}${proxiedUrl}`,
+        quality: "LIVE",
+        isM3u8: true,
+        type: "hls",
+        headers: s.headers,
+        subtitles: [],
+        provider: "dlivesport",
+        behaviorHints: {
+          notWebReady: true
         }
-      }
-    }));
+      };
+    });
     
     res.setHeader("Content-Type", "application/json");
     res.status(200).json({ streams });
@@ -354,7 +355,62 @@ module.exports = (req, res) => {
     handleMeta(req, res, url);
   } else if (url.pathname.startsWith("/stream/")) {
     handleStream(req, res, url);
+  } else if (url.pathname === "/proxy") {
+    handleProxy(req, res, url);
   } else {
     res.status(404).json({ error: "Not found" });
   }
 };
+
+// Stream proxy - fetches content with proper headers
+function handleProxy(req, res, url) {
+  const targetUrl = url.searchParams.get("url");
+  const referer = url.searchParams.get("referer") || "";
+  
+  if (!targetUrl) {
+    res.status(400).json({ error: "Missing url parameter" });
+    return;
+  }
+  
+  const headers = { "User-Agent": UA };
+  if (referer) headers["Referer"] = referer;
+  
+  const lib = targetUrl.startsWith("https") ? https : http;
+  const proxyReq = lib.get(targetUrl, { headers }, (proxyRes) => {
+    // If it's an m3u8 playlist, rewrite segment URLs
+    if (targetUrl.includes(".m3u8") || (proxyRes.headers["content-type"] || "").includes("mpegurl")) {
+      let data = "";
+      proxyRes.on("data", (chunk) => (data += chunk));
+      proxyRes.on("end", () => {
+        const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf("/") + 1);
+        const rewritten = data.split("\n").map((line) => {
+          line = line.trim();
+          if (line && !line.startsWith("#") && !line.startsWith("http")) {
+            // Relative URL - make it absolute and proxy it
+            const absUrl = baseUrl + line;
+            return `/proxy?url=${encodeURIComponent(absUrl)}&referer=${encodeURIComponent(referer)}`;
+          }
+          if (line && !line.startsWith("#") && line.startsWith("http")) {
+            // Absolute URL - proxy it
+            return `/proxy?url=${encodeURIComponent(line)}&referer=${encodeURIComponent(referer)}`;
+          }
+          return line;
+        }).join("\n");
+        
+        res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.status(200).send(rewritten);
+      });
+    } else {
+      // Binary content (segments) - stream through
+      res.setHeader("Content-Type", proxyRes.headers["content-type"] || "application/octet-stream");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      proxyRes.pipe(res);
+    }
+  });
+  
+  proxyReq.on("error", (e) => {
+    res.status(500).json({ error: e.message });
+  });
+  proxyReq.setTimeout(30000, () => { proxyReq.destroy(); res.status(504).json({ error: "timeout" }); });
+}
