@@ -185,6 +185,29 @@ function fetchUrl(url, headers = {}) {
   });
 }
 
+// Base64 decode helper
+function b64ToBin(s) {
+  s = String(s == null ? "" : s).replace(/[^A-Za-z0-9+\/=]/g, "");
+  const buf = Buffer.from(s, "base64");
+  return buf.toString("binary");
+}
+
+// tossequip _econfig decoder
+function decodeEconfig(enc) {
+  const d1 = b64ToBin(enc);
+  const size = Math.ceil(d1.length / 4);
+  const order = [2, 0, 3, 1];
+  const parts = ["", "", "", ""];
+  for (let i = 0; i < 4; i++) {
+    let chunk = d1.substr(i * size, size);
+    if (chunk.length >= 5) chunk = chunk.substring(0, 3) + chunk.substring(4);
+    parts[order[i]] = b64ToBin(chunk);
+  }
+  const joined = parts.join("");
+  const decoded = Buffer.from(joined, "base64").toString("utf8");
+  return JSON.parse(decoded);
+}
+
 const manifest = {
   id: "app.justemir.sport",
   name: "Justemir Sport",
@@ -289,7 +312,10 @@ function handleStream(req, res, url) {
       .then((r) => {
         const m = r.body.match(/window\._econfig='([^']+)'/);
         if (!m) throw new Error("_econfig bulunamadi");
-        return { name: "Justemir Sport - Sunucu 2 (SwarmCloud)", url: m[1], headers: { "User-Agent": UA, Referer: "https://tossequip.net/" } };
+        const cfg = decodeEconfig(m[1]);
+        const src = cfg && (cfg.stream_url_nop2p || cfg.stream_url);
+        if (!src) throw new Error("stream_url yok");
+        return { name: "Justemir Sport - Sunucu 2 (SwarmCloud)", url: String(src).replace(/\\\//g, "/"), headers: { "User-Agent": UA, Referer: "https://tossequip.net/" } };
       })
       .catch(() => null)
   ]).then((results) => {
