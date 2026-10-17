@@ -388,11 +388,11 @@ function handleProxy(req, res, url) {
           if (line && !line.startsWith("#") && !line.startsWith("http")) {
             // Relative URL - make it absolute and proxy it
             const absUrl = baseUrl + line;
-            return `/proxy?url=${encodeURIComponent(absUrl)}&referer=${encodeURIComponent(referer)}`;
+            return `https://${req.headers.host}/proxy?url=${encodeURIComponent(absUrl)}&referer=${encodeURIComponent(referer)}`;
           }
           if (line && !line.startsWith("#") && line.startsWith("http")) {
             // Absolute URL - proxy it
-            return `/proxy?url=${encodeURIComponent(line)}&referer=${encodeURIComponent(referer)}`;
+            return `https://${req.headers.host}/proxy?url=${encodeURIComponent(line)}&referer=${encodeURIComponent(referer)}`;
           }
           return line;
         }).join("\n");
