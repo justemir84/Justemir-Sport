@@ -192,15 +192,15 @@ const manifest = {
   description: "Canli spor kanallari (beIN SPORTS odakli) - DLHD + SwarmCloud backend",
   logo: "https://dlive.sx/assets/logos/logo.png",
   resources: [
-    { name: "catalog", types: ["channel"], idPrefixes: ["jss"] },
-    { name: "meta", types: ["channel"], idPrefixes: ["jss"] },
-    { name: "stream", types: ["channel"], idPrefixes: ["jss"] }
+    { name: "catalog", types: ["tv"], idPrefixes: ["jss"] },
+    { name: "meta", types: ["tv"], idPrefixes: ["jss"] },
+    { name: "stream", types: ["tv"], idPrefixes: ["jss"] }
   ],
-  types: ["channel"],
+  types: ["tv"],
   idPrefixes: ["jss"],
   catalogs: [
-    { id: "bein-sports", name: "beIN Sports", type: "channel", extra: [{ name: "search", isRequired: false }] },
-    { id: "canli-sport", name: "Canli Spor Kanallari", type: "channel", extra: [{ name: "search", isRequired: false }] }
+    { id: "bein-sports", name: "beIN Sports", type: "tv", extra: [{ name: "search", isRequired: false }] },
+    { id: "canli-sport", name: "Canli Spor Kanallari", type: "tv", extra: [{ name: "search", isRequired: false }] }
   ]
 };
 
@@ -213,7 +213,7 @@ function handleCatalog(req, res, url) {
   
   let items = ids.map((id) => ({
     id: `jss:${id}`,
-    type: "channel",
+    type: "tv",
     name: CHANNELS[id] || `Kanal ${id}`,
     poster: "https://dlive.sx/assets/logos/logo.png"
   }));
@@ -248,7 +248,7 @@ function handleMeta(req, res, url) {
   res.status(200).json({
     meta: {
       id: `jss:${chId}`,
-      type: "channel",
+      type: "tv",
       name: name,
       poster: "https://dlive.sx/assets/logos/logo.png",
       posterShape: "square",
